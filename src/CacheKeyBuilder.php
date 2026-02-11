@@ -76,29 +76,50 @@ class CacheKeyBuilder
     }
 
     /**
-     * Build a resource cache pattern.
+     * Build a resource cache pattern (scope-aware).
      *
-     * Resource cache format: {prefix}:resource:{group}:var_{variant}:id_{id}
+     * NEW format: {prefix}:resource:{scope}:{scope_id}:{group}:*
+     * OLD format: {prefix}:resource:{group}:*  (no scope = nuclear flush)
      *
      * @param string $group Cache group prefix
+     * @param string $scope Scope type ('global', 'user', 'role', etc.)
+     * @param string|null $identifier Scope identifier (null = wildcard all)
      * @return string Resource pattern
      */
-    public static function buildResourcePattern(string $group): string
-    {
+    public static function buildResourcePattern(
+        string $group,
+        string $scope = 'global',
+        ?string $identifier = null
+    ): string {
         $cachePrefix = self::getCachePrefix();
 
-        return "{$cachePrefix}:resource:{$group}:*";
+        if ($scope !== 'global' && $identifier !== null) {
+            return "{$cachePrefix}:resource:{$scope}:{$scope}_{$identifier}:{$group}:*";
+        }
+
+        if ($scope !== 'global' && $identifier === null) {
+            // Wildcard: match ALL users/roles for this group
+            return "{$cachePrefix}:resource:{$scope}:{$scope}_*:{$group}:*";
+        }
+
+        // Global resource
+        return "{$cachePrefix}:resource:global:{$group}:*";
     }
 
     /**
      * Build a resource cache pattern for cluster.
      *
      * @param string $group Cache group prefix
+     * @param string $scope Scope type
+     * @param string|null $identifier Scope identifier
      * @return string Hash-aware resource pattern
      */
-    public static function buildClusterResourcePattern(string $group): string
-    {
-        return '*:' . self::buildResourcePattern($group);
+    public static function buildClusterResourcePattern(
+        string $group,
+        string $scope = 'global',
+        ?string $identifier = null
+    ): string {
+        return '*:' . self::buildResourcePattern($group, $scope, $identifier);
     }
 
     /**

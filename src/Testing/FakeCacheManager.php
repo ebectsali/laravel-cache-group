@@ -258,7 +258,7 @@ class FakeInvalidationStrategy implements InvalidationStrategy
         return 1;
     }
 
-    public function invalidateResource(string $prefix, ?string $identifier = null): int
+    public function invalidateResource(string $prefix, string $scope = 'global', ?string $identifier = null): int
     {
         return 1;
     }

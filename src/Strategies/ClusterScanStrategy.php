@@ -68,9 +68,9 @@ class ClusterScanStrategy implements InvalidationStrategy
     /**
      * {@inheritdoc}
      */
-    public function invalidateResource(string $prefix, ?string $identifier = null): int
+    public function invalidateResource(string $prefix, string $scope = 'global', ?string $identifier = null): int
     {
-        $pattern = CacheKeyBuilder::buildClusterResourcePattern($prefix);
+        $pattern = CacheKeyBuilder::buildClusterResourcePattern($prefix, $scope, $identifier);
 
         $deleted = $this->scanAndDelete($pattern);
 

@@ -61,7 +61,7 @@ class CacheManager
 
         try {
             $deleted = $this->strategy->invalidateAll($prefix, $scope);
-            $deleted += $this->strategy->invalidateResource($prefix);
+            $deleted += $this->strategy->invalidateResource($prefix, $scope);
 
             $duration = (microtime(true) - $start) * 1000;
             CacheInvalidated::dispatch($prefix, $scope, '*', $deleted, $this->getStrategyName(), $duration);
@@ -198,7 +198,7 @@ class CacheManager
 
         try {
             $deleted = $this->strategy->invalidate($prefix, $scope, $identifier);
-            $deleted += $this->strategy->invalidateResource($prefix, $identifier);
+            $deleted += $this->strategy->invalidateResource($prefix, $scope, $identifier);
 
             $duration = (microtime(true) - $start) * 1000;
             CacheInvalidated::dispatch($prefix, $scope, $identifier, $deleted, $this->getStrategyName(), $duration);

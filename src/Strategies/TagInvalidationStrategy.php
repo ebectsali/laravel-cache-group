@@ -39,10 +39,12 @@ class TagInvalidationStrategy implements InvalidationStrategy
         }
     }
 
-    public function invalidateResource(string $prefix, ?string $identifier = null): int
+    public function invalidateResource(string $prefix, string $scope = 'global', ?string $identifier = null): int
     {
         try {
-            Cache::tags([$prefix])->flush();
+            // 🔥 FIX: Use composite tags for precise resource invalidation
+            $tags = CacheKeyBuilder::buildTags($prefix, $scope, $identifier);
+            Cache::tags($tags)->flush();
             return 1;
         } catch (\Exception $e) {
             Log::warning('CacheGroup: Tag resource invalidation failed', [

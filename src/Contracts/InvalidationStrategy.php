@@ -6,7 +6,7 @@ namespace Ebects\LaravelCacheGroup\Contracts;
  * InvalidationStrategy Contract
  *
  * Defines how cache keys are deleted from the store.
- * Two implementations provided: TagStrategy (single Redis) and ClusterScanStrategy (Redis Cluster).
+ * Two implementations provided: TagInvalidationStrategy (single Redis) and ClusterScanStrategy (Redis Cluster).
  */
 interface InvalidationStrategy
 {
@@ -35,10 +35,11 @@ interface InvalidationStrategy
      * Invalidate resource cache (detail/single record cache).
      *
      * @param string $prefix Cache group prefix
+     * @param string $scope Scope type ('global', 'user', 'role', etc.)
      * @param string|null $identifier Optional scope identifier
      * @return int Number of keys deleted
      */
-    public function invalidateResource(string $prefix, ?string $identifier = null): int;
+    public function invalidateResource(string $prefix, string $scope = 'global', ?string $identifier = null): int;
 
     /**
      * Check if this strategy is available in the current environment.

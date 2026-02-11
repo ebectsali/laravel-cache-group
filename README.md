@@ -18,6 +18,7 @@ Group-based cache invalidation for Laravel — organize cache by groups, invalid
 - 🔌 **Pluggable Auth** — works with Sanctum, JWT, Passport, or any custom auth
 - 🔍 **Artisan Commands** — inspect, validate, and monitor cache groups
 - 🧪 **Testing Utilities** — FakeCacheManager with assertion helpers
+- 📝 **CacheGroupStore** — scope-aware `remember()` and `rememberResource()` helpers
 
 ## Installation
 
@@ -96,13 +97,31 @@ public function boot(): void
 }
 ```
 
-### 3. Use the Trait in Your Actions
+### 3. Store Cache with CacheGroupStore (READ side)
 
 ```php
-<?php
+use Ebects\LaravelCacheGroup\CacheGroupStore;
 
-namespace App\Actions\Posts;
+// In controller — auto-resolves user/role from auth
+$posts = CacheGroupStore::remember(
+    'posts.list',                            // prefix
+    'list',                                  // variant
+    fn() => Post::paginate(20),              // callback
+    extraParams: request()->all()            // unique per filter/page
+);
 
+// Resource/detail cache — scope-aware!
+$post = CacheGroupStore::rememberResource(
+    'posts.list',                            // prefix
+    'detail',                                // variable name
+    $postId,                                 // resource ID
+    fn() => Post::findOrFail($postId)        // callback
+);
+```
+
+### 4. Invalidate Cache (WRITE side)
+
+```php
 use Ebects\LaravelCacheGroup\Traits\InvalidatesCache;
 
 class CreatePost
@@ -121,9 +140,7 @@ class CreatePost
 }
 ```
 
-### 4. Implement ScopeResolver
-
-Create a resolver that tells the library how to identify users/roles in your system:
+### 5. Implement ScopeResolver
 
 ```php
 <?php
@@ -173,9 +190,68 @@ Register in config:
 'scope_resolver' => App\Cache\AppScopeResolver::class,
 ```
 
-## Usage
+## CacheGroupStore API
 
-### From HTTP Request (Controller/Action)
+The READ side — storing and retrieving cached data with automatic scope handling.
+
+### `remember()` — HTTP context (auto-resolve scope)
+
+```php
+// Simple
+$data = CacheGroupStore::remember('dashboard.stats', 'summary', fn() => expensive());
+
+// With request params for unique key per page/filter
+$data = CacheGroupStore::remember('posts.list', 'list', fn() => Post::paginate(), extraParams: request()->all());
+
+// Custom TTL
+$data = CacheGroupStore::remember('reports', 'monthly', fn() => generateReport(), ttl: 7200);
+```
+
+### `rememberFor()` — Queue/CLI context (explicit scope)
+
+```php
+// In queue job — no auth session available
+$data = CacheGroupStore::rememberFor(
+    'dashboard.stats', 'summary',
+    'user', $userId,                    // explicit scope + target
+    fn() => expensiveCalculation()
+);
+```
+
+### `rememberResource()` — Resource/detail cache (scope-aware)
+
+```php
+// Auto-resolve scope from auth
+$detail = CacheGroupStore::rememberResource(
+    'surat_masuk.main',                 // prefix
+    'detail',                           // variable name
+    $suratId,                           // resource ID
+    fn() => Surat::findOrFail($suratId)
+);
+
+// Explicit scope for queue
+$detail = CacheGroupStore::rememberResourceFor(
+    'surat_masuk.main', 'detail', $suratId,
+    'user', $userId,
+    fn() => Surat::findOrFail($suratId)
+);
+```
+
+### Utility methods
+
+```php
+// Check if cache exists
+CacheGroupStore::has('posts.list', 'list');
+
+// Forget specific entry
+CacheGroupStore::forget('posts.list', 'list');
+```
+
+## Invalidation API
+
+The WRITE side — clearing cache when data changes.
+
+### Using Trait (recommended)
 
 ```php
 use Ebects\LaravelCacheGroup\Traits\InvalidatesCache;
@@ -188,38 +264,22 @@ class UpdatePost
     {
         $post->update($data);
 
-        // Option 1: Auto from class mapping
+        // Auto from class mapping (HTTP context)
         $this->invalidateCache();
 
-        // Option 2: Specific prefix
+        // Explicit scope + target (queue safe)
+        $this->invalidateCacheFor('user', $userId);
+
+        // Specific prefix
         $this->invalidateCacheByPrefix('posts.list');
 
-        // Option 3: Nuclear — all users
+        // Nuclear — all users
         $this->invalidateAllCache('posts.list');
-
-        return $post;
-    }
-}
-```
-
-### From Queue Job (No Auth Context)
-
-```php
-class ProcessImport implements ShouldQueue
-{
-    use InvalidatesCache;
-
-    public function __construct(
-        private string $userId,
-    ) {}
-
-    public function handle(): void
-    {
-        // Must pass explicit target — no auth in queue
-        $this->invalidateCacheFor('user', $this->userId);
 
         // Multiple targets
         $this->invalidateCacheForMany('user', [$userId1, $userId2]);
+
+        return $post;
     }
 }
 ```
@@ -244,23 +304,6 @@ if ($result['throttled']) {
     return response()->json([
         'message' => "Please wait {$result['retry_after']} seconds",
     ], 429);
-}
-```
-
-Configure throttle per group:
-
-```php
-public static function getConfig(): array
-{
-    return [
-        'scope' => 'user',
-        'ttl' => 3600,
-        'throttle' => [
-            'enabled' => true,
-            'strategy' => 'throttle', // 'throttle' or 'debounce'
-            'window' => 5,            // seconds
-        ],
-    ];
 }
 ```
 

@@ -64,10 +64,24 @@ class CacheKeyBuilderTest extends TestCase
     }
 
     /** @test */
-    public function it_builds_resource_pattern()
+    public function it_builds_global_resource_pattern()
     {
         $pattern = CacheKeyBuilder::buildResourcePattern('dashboard');
-        $this->assertEquals('test_cache:resource:dashboard:*', $pattern);
+        $this->assertEquals('test_cache:resource:global:dashboard:*', $pattern);
+    }
+
+    /** @test */
+    public function it_builds_scoped_resource_pattern()
+    {
+        $pattern = CacheKeyBuilder::buildResourcePattern('dashboard', 'user', 'ABC123');
+        $this->assertEquals('test_cache:resource:user:user_ABC123:dashboard:*', $pattern);
+    }
+
+    /** @test */
+    public function it_builds_wildcard_resource_pattern_for_all_users()
+    {
+        $pattern = CacheKeyBuilder::buildResourcePattern('dashboard', 'user', null);
+        $this->assertEquals('test_cache:resource:user:user_*:dashboard:*', $pattern);
     }
 
     /** @test */
