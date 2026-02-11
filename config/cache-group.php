@@ -35,6 +35,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Variant Resolver
+    |--------------------------------------------------------------------------
+    |
+    | Determines the "variant" portion of cache keys — what makes each
+    | cache entry unique within the same prefix + scope.
+    |
+    | Must implement Ebects\LaravelCacheGroup\Contracts\VariantResolver.
+    |
+    | Default: RequestVariantResolver (auto route name + request params hash).
+    | Override this for custom key strategies.
+    |
+    | Example (Nadine): App\Cache\NadineVariantResolver::class
+    |
+    */
+    'variant_resolver' => Ebects\LaravelCacheGroup\RequestVariantResolver::class,
+
+    /*
+    |--------------------------------------------------------------------------
     | Invalidation Strategy
     |--------------------------------------------------------------------------
     |

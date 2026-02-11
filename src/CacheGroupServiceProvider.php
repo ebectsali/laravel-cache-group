@@ -7,6 +7,7 @@ use Ebects\LaravelCacheGroup\Commands\CacheInspectCommand;
 use Ebects\LaravelCacheGroup\Commands\CacheValidateCommand;
 use Ebects\LaravelCacheGroup\Contracts\InvalidationStrategy;
 use Ebects\LaravelCacheGroup\Contracts\ScopeResolver;
+use Ebects\LaravelCacheGroup\Contracts\VariantResolver;
 use Ebects\LaravelCacheGroup\Strategies\HybridStrategy;
 use Illuminate\Support\ServiceProvider;
 
@@ -27,6 +28,16 @@ class CacheGroupServiceProvider extends ServiceProvider
             }
 
             return new DefaultScopeResolver();
+        });
+
+        $this->app->singleton(VariantResolver::class, function ($app) {
+            $resolverClass = config('cache-group.variant_resolver');
+
+            if ($resolverClass && class_exists($resolverClass)) {
+                return $app->make($resolverClass);
+            }
+
+            return new RequestVariantResolver();
         });
 
         $this->app->singleton(InvalidationStrategy::class, function () {
