@@ -1,0 +1,61 @@
+{
+    "name": "ebects/laravel-cache-group",
+    "description": "Group-based cache invalidation for Laravel — organize cache by groups, invalidate by scope (user/role/custom), with automatic Redis Cluster compatibility.",
+    "keywords": [
+        "laravel",
+        "cache",
+        "redis",
+        "redis-cluster",
+        "invalidation",
+        "cache-group",
+        "cache-tags",
+        "scope"
+    ],
+    "homepage": "https://github.com/ebectsali/laravel-cache-group",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "ebects",
+            "homepage": "https://github.com/ebectsali"
+        }
+    ],
+    "require": {
+        "php": "^8.1|^8.2|^8.3",
+        "illuminate/cache": "^10.0|^11.0|^12.0",
+        "illuminate/console": "^10.0|^11.0|^12.0",
+        "illuminate/redis": "^10.0|^11.0|^12.0",
+        "illuminate/support": "^10.0|^11.0|^12.0"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.0",
+        "mockery/mockery": "^1.5",
+        "orchestra/testbench": "^8.0|^9.0|^10.0",
+        "phpunit/phpunit": "^10.0|^11.0",
+        "predis/predis": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Ebects\\LaravelCacheGroup\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Ebects\\LaravelCacheGroup\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Ebects\\LaravelCacheGroup\\CacheGroupServiceProvider"
+            ],
+            "aliases": {
+                "CacheGroup": "Ebects\\LaravelCacheGroup\\Facades\\CacheGroup"
+            }
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
