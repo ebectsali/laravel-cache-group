@@ -58,6 +58,18 @@ class CacheGroupServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Register class-based groups
+        $groups = config('cache-group.groups', []);
+        if (! empty($groups)) {
+            CacheRegistry::registerMany($groups);
+        }
+
+        // Register flat prefix configs (for apps with their own CacheGroup format)
+        $flatConfigs = config('cache-group.prefix_configs', []);
+        if (! empty($flatConfigs)) {
+            CacheRegistry::registerFlatConfigs($flatConfigs);
+        }
+
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 __DIR__ . '/../config/cache-group.php' => config_path('cache-group.php'),

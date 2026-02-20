@@ -10,6 +10,12 @@ class CacheRegistry
     /** @var array<class-string<CacheGroupInterface>> */
     protected static array $groups = [];
 
+    /**
+     * Flat prefix configs — for apps that don't use CacheGroupInterface classes.
+     * Format: ['prefix' => ['type' => 'peruser', 'ttl' => 3600, ...], ...]
+     */
+    protected static array $flatConfigs = [];
+
     protected static ?array $routesCache = null;
     protected static ?array $classMappingCache = null;
     protected static ?array $groupsCache = null;
@@ -38,6 +44,27 @@ class CacheRegistry
         }
     }
 
+    /**
+     * Register flat prefix configs (no CacheGroupInterface class needed).
+     *
+     * Useful for apps that have their own CacheGroup format and want to
+     * feed config directly without implementing CacheGroupInterface.
+     *
+     * Usage in ServiceProvider:
+     *   CacheRegistry::registerFlatConfigs(config('cache-mapping.routes'));
+     *
+     * @param array<string, array> $configs ['prefix' => ['type' => 'peruser', 'ttl' => 3600, ...]]
+     */
+    public static function registerFlatConfigs(array $configs): void
+    {
+        foreach ($configs as $prefix => $config) {
+            if (is_string($prefix) && is_array($config)) {
+                self::$flatConfigs[$prefix] = $config;
+            }
+        }
+        self::clearCache();
+    }
+
     public static function getRegisteredGroups(): array
     {
         return self::$groups;
@@ -49,8 +76,10 @@ class CacheRegistry
             return self::$routesCache;
         }
 
-        $routes = [];
+        // Start with flat configs
+        $routes = self::$flatConfigs;
 
+        // Class-based groups override flat configs
         foreach (self::$groups as $groupClass) {
             $prefix = $groupClass::getPrefix();
             $config = $groupClass::getConfig();
@@ -253,6 +282,7 @@ class CacheRegistry
     public static function reset(): void
     {
         self::$groups = [];
+        self::$flatConfigs = [];
         self::clearCache();
     }
 }

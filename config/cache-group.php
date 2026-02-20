@@ -21,6 +21,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Prefix Configs (Flat)
+    |--------------------------------------------------------------------------
+    |
+    | Alternative to class-based groups. Register prefix configs directly
+    | as a flat array. Useful for apps that have their own CacheGroup format.
+    |
+    | Format: 'prefix' => ['type' => 'peruser', 'ttl' => 3600, 'also_invalidate' => [...]]
+    |
+    | Example (Nadine): Feed from existing CacheRegistry:
+    |   'prefix_configs' => \App\Cache\CacheRegistry::generateRoutesConfig(),
+    |
+    */
+    'prefix_configs' => [],
+
+    /*
+    |--------------------------------------------------------------------------
     | Scope Resolver
     |--------------------------------------------------------------------------
     |
