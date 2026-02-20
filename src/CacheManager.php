@@ -81,10 +81,15 @@ class CacheManager
     {
         $prefixes = CacheRegistry::getPrefixesForClass($actionClass);
         $totalDeleted = 0;
+        $visited = []; // shared across all prefixes to prevent duplicate invalidation
 
         foreach ($prefixes as $prefix) {
+            if (in_array($prefix, $visited, true)) {
+                continue;
+            }
+            $visited[] = $prefix;
             $totalDeleted += $this->invalidate($prefix);
-            $totalDeleted += $this->invalidateRelated($prefix);
+            $totalDeleted += $this->invalidateRelated($prefix, $visited);
         }
 
         return $totalDeleted;
@@ -94,10 +99,15 @@ class CacheManager
     {
         $prefixes = CacheRegistry::getPrefixesForClass($actionClass);
         $totalDeleted = 0;
+        $visited = []; // shared across all prefixes
 
         foreach ($prefixes as $prefix) {
+            if (in_array($prefix, $visited, true)) {
+                continue;
+            }
+            $visited[] = $prefix;
             $totalDeleted += $this->invalidateFor($prefix, $scope, $target);
-            $totalDeleted += $this->invalidateRelatedFor($prefix, $scope, $target);
+            $totalDeleted += $this->invalidateRelatedFor($prefix, $scope, $target, $visited);
         }
 
         return $totalDeleted;
@@ -130,12 +140,9 @@ class CacheManager
         return $this->throttleInvalidation($prefix, $lockKey, $window);
     }
 
-    public function invalidateRelated(string $prefix, array $visited = []): int
+    public function invalidateRelated(string $prefix, array &$visited = []): int
     {
         if (in_array($prefix, $visited, true)) {
-            Log::warning('CacheGroup: Circular dependency detected', [
-                'chain' => array_merge($visited, [$prefix]),
-            ]);
             return 0;
         }
 
@@ -144,7 +151,12 @@ class CacheManager
         $totalDeleted = 0;
 
         foreach ($relatedPrefixes as $relatedPrefix) {
+            if (in_array($relatedPrefix, $visited, true)) {
+                continue; // already invalidated, skip
+            }
+
             try {
+                $visited[] = $relatedPrefix;
                 $totalDeleted += $this->invalidate($relatedPrefix);
                 $totalDeleted += $this->invalidateRelated($relatedPrefix, $visited);
             } catch (\Exception $e) {
@@ -159,7 +171,7 @@ class CacheManager
         return $totalDeleted;
     }
 
-    public function invalidateRelatedFor(string $prefix, string $scope, mixed $target, array $visited = []): int
+    public function invalidateRelatedFor(string $prefix, string $scope, mixed $target, array &$visited = []): int
     {
         if (in_array($prefix, $visited, true)) {
             return 0;
@@ -170,7 +182,12 @@ class CacheManager
         $totalDeleted = 0;
 
         foreach ($relatedPrefixes as $relatedPrefix) {
+            if (in_array($relatedPrefix, $visited, true)) {
+                continue; // already invalidated, skip
+            }
+
             try {
+                $visited[] = $relatedPrefix;
                 $relatedScope = CacheRegistry::getScopeForPrefix($relatedPrefix);
 
                 if ($relatedScope === 'global') {
