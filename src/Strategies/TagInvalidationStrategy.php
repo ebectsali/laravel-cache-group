@@ -9,13 +9,32 @@ use Illuminate\Support\Facades\Log;
 
 class TagInvalidationStrategy implements InvalidationStrategy
 {
+    /**
+     * Invalidate cache for a specific prefix + scope.
+     *
+     * IMPORTANT: Laravel's Cache::tags(['a', 'b'])->flush() does a UNION flush —
+     * it deletes ALL entries from BOTH tag sets. This means using composite tags
+     * for flush would be overly aggressive (nuclear flush).
+     *
+     * Strategy:
+     *   - Global: flush by prefix tag → all entries for this prefix
+     *   - Scoped (peruser/perrole): flush by scope tag → all entries for this user/role
+     *     This matches Nadine's original behavior and is safe.
+     */
     public function invalidate(string $prefix, string $scope, ?string $identifier = null): int
     {
         try {
-            $tags = CacheKeyBuilder::buildTags($prefix, $scope, $identifier);
-            Cache::tags($tags)->flush();
+            if ($scope === 'global' || $identifier === null) {
+                // Global: flush everything under this prefix
+                Cache::tags([$prefix])->flush();
+                $this->debug('Global tag flush', compact('prefix'));
+            } else {
+                // Scoped: flush by scope tag (all cache for this user/role)
+                $scopeTag = CacheKeyBuilder::buildScopeTag($scope, $identifier);
+                Cache::tags([$scopeTag])->flush();
+                $this->debug('Scoped tag flush', compact('prefix', 'scope', 'identifier', 'scopeTag'));
+            }
 
-            $this->debug('Tag invalidation completed', compact('prefix', 'scope', 'identifier', 'tags'));
             return 1;
         } catch (\Exception $e) {
             Log::error('CacheGroup: Tag invalidation failed', [
@@ -25,11 +44,15 @@ class TagInvalidationStrategy implements InvalidationStrategy
         }
     }
 
+    /**
+     * Invalidate ALL entries for a prefix (regardless of scope).
+     * Used for admin operations, data migrations, etc.
+     */
     public function invalidateAll(string $prefix, string $scope): int
     {
         try {
             Cache::tags([$prefix])->flush();
-            $this->debug('Tag invalidation for all completed', compact('prefix', 'scope'));
+            $this->debug('Tag flush all', compact('prefix', 'scope'));
             return 1;
         } catch (\Exception $e) {
             Log::error('CacheGroup: Tag invalidation all failed', [
@@ -39,12 +62,19 @@ class TagInvalidationStrategy implements InvalidationStrategy
         }
     }
 
+    /**
+     * Invalidate resource cache.
+     * Same strategy as invalidate() — scope tag only for scoped.
+     */
     public function invalidateResource(string $prefix, string $scope = 'global', ?string $identifier = null): int
     {
         try {
-            // 🔥 FIX: Use composite tags for precise resource invalidation
-            $tags = CacheKeyBuilder::buildTags($prefix, $scope, $identifier);
-            Cache::tags($tags)->flush();
+            if ($scope === 'global' || $identifier === null) {
+                Cache::tags([$prefix])->flush();
+            } else {
+                $scopeTag = CacheKeyBuilder::buildScopeTag($scope, $identifier);
+                Cache::tags([$scopeTag])->flush();
+            }
             return 1;
         } catch (\Exception $e) {
             Log::warning('CacheGroup: Tag resource invalidation failed', [

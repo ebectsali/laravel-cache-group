@@ -16,6 +16,12 @@ class CacheRegistry
      */
     protected static array $flatConfigs = [];
 
+    /**
+     * Flat class mapping — maps Action classes to prefixes they should invalidate.
+     * Format: ['App\Actions\InsertPost::class' => ['posts.list', 'dashboard'], ...]
+     */
+    protected static array $flatClassMapping = [];
+
     protected static ?array $routesCache = null;
     protected static ?array $classMappingCache = null;
     protected static ?array $groupsCache = null;
@@ -65,6 +71,33 @@ class CacheRegistry
         self::clearCache();
     }
 
+    /**
+     * Register flat class mapping (no CacheGroupInterface class needed).
+     *
+     * Maps Action classes to the prefixes they should invalidate.
+     *
+     * Usage in ServiceProvider:
+     *   CacheRegistry::registerFlatClassMapping(config('cache-mapping.class_mapping'));
+     *
+     * @param array<string, string[]> $mapping ['ActionClass' => ['prefix1', 'prefix2']]
+     */
+    public static function registerFlatClassMapping(array $mapping): void
+    {
+        foreach ($mapping as $class => $prefixes) {
+            if (is_string($class) && is_array($prefixes)) {
+                if (!isset(self::$flatClassMapping[$class])) {
+                    self::$flatClassMapping[$class] = [];
+                }
+                foreach ($prefixes as $prefix) {
+                    if (is_string($prefix) && !in_array($prefix, self::$flatClassMapping[$class], true)) {
+                        self::$flatClassMapping[$class][] = $prefix;
+                    }
+                }
+            }
+        }
+        self::clearCache();
+    }
+
     public static function getRegisteredGroups(): array
     {
         return self::$groups;
@@ -95,8 +128,13 @@ class CacheRegistry
             return self::$classMappingCache;
         }
 
+        // Start with flat class mapping
         $mapping = [];
+        foreach (self::$flatClassMapping as $class => $prefixes) {
+            $mapping[$class] = $prefixes;
+        }
 
+        // Class-based groups merge/override
         foreach (self::$groups as $groupClass) {
             $prefix = $groupClass::getPrefix();
             $removeClasses = $groupClass::getRemoveClasses();
@@ -283,6 +321,7 @@ class CacheRegistry
     {
         self::$groups = [];
         self::$flatConfigs = [];
+        self::$flatClassMapping = [];
         self::clearCache();
     }
 }

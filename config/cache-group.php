@@ -37,6 +37,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Class Mapping (Flat)
+    |--------------------------------------------------------------------------
+    |
+    | Maps Action/Service classes to the cache prefixes they should invalidate.
+    | Alternative to using getRemoveClasses() in CacheGroupInterface classes.
+    |
+    | Format: 'ActionClass' => ['prefix1', 'prefix2']
+    |
+    | Example (Nadine): Feed from existing CacheRegistry:
+    |   'class_mapping' => \App\Cache\CacheRegistry::generateClassMapping(),
+    |
+    */
+    'class_mapping' => [],
+
+    /*
+    |--------------------------------------------------------------------------
     | Scope Resolver
     |--------------------------------------------------------------------------
     |

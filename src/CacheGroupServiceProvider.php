@@ -70,6 +70,12 @@ class CacheGroupServiceProvider extends ServiceProvider
             CacheRegistry::registerFlatConfigs($flatConfigs);
         }
 
+        // Register flat class mapping (Action class → prefixes to invalidate)
+        $flatClassMapping = config('cache-group.class_mapping', []);
+        if (! empty($flatClassMapping)) {
+            CacheRegistry::registerFlatClassMapping($flatClassMapping);
+        }
+
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 __DIR__ . '/../config/cache-group.php' => config_path('cache-group.php'),
