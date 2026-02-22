@@ -177,7 +177,7 @@ class ClusterScanStrategy implements InvalidationStrategy
      * @param string $host
      * @return \Predis\Client
      */
-    protected function createNodeClient(string $host): \Predis\Client
+    protected function createNodeClient(string $host, ?int $port = null): \Predis\Client
     {
         $connection = config('cache-group.redis_connection', 'cache');
 
@@ -198,7 +198,7 @@ class ClusterScanStrategy implements InvalidationStrategy
         return new \Predis\Client([
             'scheme' => $redisConfig['scheme'] ?? 'tcp',
             'host' => $host,
-            'port' => (int) ($redisConfig['port'] ?? 6379),
+            'port' => $port ?? (int) ($redisConfig['port'] ?? 6379),
             'password' => $password,
             'database' => (int) ($redisConfig['database'] ?? 0),
             'timeout' => (float) config('cache-group.cluster_scan.connection_timeout', 5),
@@ -207,17 +207,130 @@ class ClusterScanStrategy implements InvalidationStrategy
     }
 
     /**
-     * Resolve Redis Cluster hosts from Laravel's database config.
-     *
-     * Reads from config('database.redis') — no hardcoded helpers needed.
+     * Resolve Redis Cluster hosts — auto-discover via CLUSTER NODES, fallback to config.
      *
      * @return array<string>
      */
     protected function resolveClusterHosts(): array
     {
+        $discovered = $this->discoverClusterNodes();
+        if (! empty($discovered)) {
+            return $discovered;
+        }
+
+        return $this->resolveHostsFromConfig();
+    }
+
+    /**
+     * Discover actual Redis Cluster master nodes via CLUSTER NODES command.
+     *
+     * Connects to any seed host (from config or service DNS), runs CLUSTER NODES,
+     * and parses the response to extract all master node IPs.
+     *
+     * Results are cached in-memory for the request lifecycle.
+     *
+     * @return array<string>
+     */
+    protected function discoverClusterNodes(): array
+    {
+        static $cached = null;
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $seedHosts = $this->resolveHostsFromConfig();
+
+        foreach ($seedHosts as $seedHost) {
+            try {
+                $client = $this->createNodeClient($seedHost);
+                $response = $client->executeRaw(['CLUSTER', 'NODES']);
+                $client->disconnect();
+
+                if (! is_string($response) || empty($response)) {
+                    continue;
+                }
+
+                $masters = $this->parseClusterNodes($response);
+                if (! empty($masters)) {
+                    return $cached = $masters;
+                }
+            } catch (\Exception $e) {
+                Log::debug('CacheGroup: CLUSTER NODES failed on seed', [
+                    'host' => $seedHost,
+                    'error' => $e->getMessage(),
+                ]);
+                continue;
+            }
+        }
+
+        return $cached = [];
+    }
+
+    /**
+     * Parse CLUSTER NODES response to extract master node hosts.
+     *
+     * Response format (one line per node):
+     *   <id> <ip:port@cport> <flags> <master|-> <pingsent> <pongreceived> <epoch> <linkstate> <slot>...
+     *
+     * @param string $response Raw CLUSTER NODES output
+     * @return array<string>
+     */
+    protected function parseClusterNodes(string $response): array
+    {
+        $masters = [];
+
+        foreach (explode("\n", trim($response)) as $line) {
+            $line = trim($line);
+            if (empty($line)) {
+                continue;
+            }
+
+            $parts = preg_split('/\s+/', $line);
+            if (count($parts) < 3) {
+                continue;
+            }
+
+            $address = $parts[1];   // e.g., '10.244.0.15:6379@16379'
+            $flags = $parts[2];     // e.g., 'master' or 'myself,master' or 'slave'
+
+            // Only include master nodes (not slaves/replicas)
+            if (! str_contains($flags, 'master')) {
+                continue;
+            }
+
+            // Skip nodes that are failing
+            if (str_contains($flags, 'fail')) {
+                continue;
+            }
+
+            // Extract host from address (strip port and cluster bus port)
+            $host = explode(':', $address)[0] ?? null;
+            if ($host && $host !== '') {
+                $masters[] = $host;
+            }
+        }
+
+        $masters = array_unique($masters);
+
+        if (! empty($masters)) {
+            Log::debug('CacheGroup: Discovered cluster master nodes', [
+                'count' => count($masters),
+                'nodes' => $masters,
+            ]);
+        }
+
+        return $masters;
+    }
+
+    /**
+     * Resolve hosts from Laravel's database config (used as seed and fallback).
+     *
+     * @return array<string>
+     */
+    protected function resolveHostsFromConfig(): array
+    {
         $hosts = [];
 
-        // Try cluster config first
         $clusters = config('database.redis.clusters', []);
         foreach ($clusters as $clusterName => $nodes) {
             if (is_array($nodes)) {
@@ -231,17 +344,15 @@ class ClusterScanStrategy implements InvalidationStrategy
             }
         }
 
-        // Fallback: single connection host
         if (empty($hosts)) {
             $connection = config('cache-group.redis_connection', 'cache');
-            $host = config("database.redis.{$connection}.host");
-
+            $host = config("database.redis.{$connection}.host")
+                ?? config("database.redis.clusters.{$connection}.0.host");
             if ($host) {
                 $hosts[] = $host;
             }
         }
 
-        // Final fallback: default connection
         if (empty($hosts)) {
             $host = config('database.redis.default.host', '127.0.0.1');
             $hosts[] = $host;
