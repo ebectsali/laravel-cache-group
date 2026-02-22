@@ -142,11 +142,10 @@ class CacheManager
 
     public function invalidateRelated(string $prefix, array &$visited = []): int
     {
-        if (in_array($prefix, $visited, true)) {
-            return 0;
+        if (! in_array($prefix, $visited, true)) {
+            $visited[] = $prefix;
         }
 
-        $visited[] = $prefix;
         $relatedPrefixes = CacheRegistry::getRelatedPrefixes($prefix);
         $totalDeleted = 0;
 
@@ -173,11 +172,10 @@ class CacheManager
 
     public function invalidateRelatedFor(string $prefix, string $scope, mixed $target, array &$visited = []): int
     {
-        if (in_array($prefix, $visited, true)) {
-            return 0;
+        if (! in_array($prefix, $visited, true)) {
+            $visited[] = $prefix;
         }
 
-        $visited[] = $prefix;
         $relatedPrefixes = CacheRegistry::getRelatedPrefixes($prefix);
         $totalDeleted = 0;
 

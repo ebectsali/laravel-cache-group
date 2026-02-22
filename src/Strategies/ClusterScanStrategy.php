@@ -180,13 +180,26 @@ class ClusterScanStrategy implements InvalidationStrategy
     protected function createNodeClient(string $host): \Predis\Client
     {
         $connection = config('cache-group.redis_connection', 'cache');
+
+        // 1. Try flat connection config: database.redis.{connection}
         $redisConfig = config("database.redis.{$connection}", []);
+
+        // 2. Fallback to cluster node config: database.redis.clusters.{connection}.0
+        if (empty($redisConfig)) {
+            $redisConfig = config("database.redis.clusters.{$connection}.0", []);
+        }
+
+        // 3. Fallback to global cluster parameters for password
+        $password = $redisConfig['password'] ?? null;
+        if ($password === null) {
+            $password = config('database.redis.options.parameters.password');
+        }
 
         return new \Predis\Client([
             'scheme' => $redisConfig['scheme'] ?? 'tcp',
             'host' => $host,
             'port' => (int) ($redisConfig['port'] ?? 6379),
-            'password' => $redisConfig['password'] ?? null,
+            'password' => $password,
             'database' => (int) ($redisConfig['database'] ?? 0),
             'timeout' => (float) config('cache-group.cluster_scan.connection_timeout', 5),
             'read_write_timeout' => (float) config('cache-group.cluster_scan.read_write_timeout', 10),
