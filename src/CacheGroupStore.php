@@ -67,17 +67,19 @@ class CacheGroupStore
             // Resolve WHAT via VariantResolver
             $variant = app(VariantResolver::class)->resolve($prefix);
 
-            // Build key without tags — invalidation handled by strategy layer (tags or SCAN+DEL)
+            // Build key + tags
             $cacheKey = CacheKeyBuilder::buildKey($prefix, $scope, $identifier, $variant);
+            $tags = CacheKeyBuilder::buildTags($prefix, $scope, $identifier);
 
             self::debug('remember: lookup', [
                 'key' => $cacheKey,
+                'tags' => $tags,
                 'scope' => $scope,
                 'identifier' => $identifier,
                 'ttl' => $finalTtl,
             ]);
 
-            return Cache::remember($cacheKey, $finalTtl, function () use ($callback, $cacheKey) {
+            return Cache::tags($tags)->remember($cacheKey, $finalTtl, function () use ($callback, $cacheKey) {
                 self::debug('remember: MISS', ['key' => $cacheKey]);
                 return $callback();
             });
@@ -133,8 +135,9 @@ class CacheGroupStore
             );
 
             $cacheKey = CacheKeyBuilder::buildKey($prefix, $scope, $identifier, $variant);
+            $tags = CacheKeyBuilder::buildTags($prefix, $scope, $identifier);
 
-            return Cache::remember($cacheKey, $finalTtl, function () use ($callback) {
+            return Cache::tags($tags)->remember($cacheKey, $finalTtl, function () use ($callback) {
                 return $callback();
             });
 
@@ -155,7 +158,7 @@ class CacheGroupStore
      * Remember resource/detail data — scope-aware.
      *
      * FIX over Nadine's rememberResourceData():
-     * - Scope-aware keys → invalidation per-user via strategy layer, not nuclear
+     * - Tags now include scope identifier → flush per-user, not nuclear
      *
      * @param string $prefix Cache group prefix
      * @param string $variableName Resource type (e.g. 'detail', PrefixCache::VL_GROUP_TU)
@@ -190,14 +193,16 @@ class CacheGroupStore
 
             $resourceIdStr = self::normalizeResourceId($resourceId);
             $cacheKey = self::buildResourceCacheKey($prefix, $scope, $identifier, $variableName, $resourceIdStr);
+            $tags = CacheKeyBuilder::buildTags($prefix, $scope, $identifier);
 
             self::debug('rememberResource: lookup', [
                 'key' => $cacheKey,
+                'tags' => $tags,
                 'variable' => $variableName,
                 'resource_id' => $resourceIdStr,
             ]);
 
-            return Cache::remember($cacheKey, $finalTtl, function () use ($callback, $cacheKey) {
+            return Cache::tags($tags)->remember($cacheKey, $finalTtl, function () use ($callback, $cacheKey) {
                 self::debug('rememberResource: MISS', ['key' => $cacheKey]);
                 return $callback();
             });
@@ -236,8 +241,9 @@ class CacheGroupStore
 
             $resourceIdStr = self::normalizeResourceId($resourceId);
             $cacheKey = self::buildResourceCacheKey($prefix, $scope, $identifier, $variableName, $resourceIdStr);
+            $tags = CacheKeyBuilder::buildTags($prefix, $scope, $identifier);
 
-            return Cache::remember($cacheKey, $finalTtl, function () use ($callback) {
+            return Cache::tags($tags)->remember($cacheKey, $finalTtl, function () use ($callback) {
                 return $callback();
             });
 
@@ -267,8 +273,9 @@ class CacheGroupStore
 
             $variant = app(VariantResolver::class)->resolve($prefix);
             $cacheKey = CacheKeyBuilder::buildKey($prefix, $scope, $identifier, $variant);
+            $tags = CacheKeyBuilder::buildTags($prefix, $scope, $identifier);
 
-            return Cache::has($cacheKey);
+            return Cache::tags($tags)->has($cacheKey);
         } catch (\Exception $e) {
             return false;
         }
@@ -287,8 +294,9 @@ class CacheGroupStore
 
             $variant = app(VariantResolver::class)->resolve($prefix);
             $cacheKey = CacheKeyBuilder::buildKey($prefix, $scope, $identifier, $variant);
+            $tags = CacheKeyBuilder::buildTags($prefix, $scope, $identifier);
 
-            return Cache::forget($cacheKey);
+            return Cache::tags($tags)->forget($cacheKey);
         } catch (\Exception $e) {
             return false;
         }

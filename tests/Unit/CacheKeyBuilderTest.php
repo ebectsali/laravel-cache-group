@@ -85,6 +85,20 @@ class CacheKeyBuilderTest extends TestCase
     }
 
     /** @test */
+    public function it_builds_composite_tags_for_scoped()
+    {
+        $tags = CacheKeyBuilder::buildTags('dashboard', 'user', 'ABC123');
+        $this->assertEquals(['dashboard', 'user_ABC123'], $tags);
+    }
+
+    /** @test */
+    public function it_builds_single_tag_for_global()
+    {
+        $tags = CacheKeyBuilder::buildTags('master.data', 'global', null);
+        $this->assertEquals(['master.data'], $tags);
+    }
+
+    /** @test */
     public function keys_never_contain_double_colons_with_spaces()
     {
         $testCases = [

@@ -123,6 +123,29 @@ class CacheKeyBuilder
     }
 
     /**
+     * Build tags array for Cache::tags() usage.
+     * Uses composite tags for precise invalidation.
+     *
+     * @param string $group Cache group prefix
+     * @param string $scope Scope type
+     * @param string|null $identifier Scope identifier
+     * @return array Tags array
+     */
+    public static function buildTags(
+        string $group,
+        string $scope,
+        ?string $identifier = null
+    ): array {
+        $tags = [$group];
+
+        if ($scope !== 'global' && $identifier !== null) {
+            $tags[] = "{$scope}_{$identifier}";
+        }
+
+        return $tags;
+    }
+
+    /**
      * Build scope tag only (for broad scope invalidation).
      *
      * @param string $scope Scope type
